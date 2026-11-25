@@ -96,3 +96,14 @@ sub 20 % la 5-6), muschi scheletic (nu sub 44 kg), grasime viscerala (sub 9), ta
 ## De ajustat
 Daca in saptamanile 3-4 simte spatele jos obosit marti (genuflexiuni luni + indreptari marti),
 inversam luni cu joi. Programul de baza ramane acelasi.
+
+## v1.1 (25 noiembrie 2026) — mutarea unui antrenament pe alta zi
+- Pe orice zi de antrenament care nu e cea de azi apare butonul **FAC ANTRENAMENTUL ASTA AZI**.
+  Dupa apasare, ziua aleasa devine antrenamentul de azi: se pot scrie seturile, apar greutatile
+  recomandate si ultima data, merge cronometrul si bifatul.
+- Sus scrie "MUTAT PE AZI", iar butonul **ANULEAZA MUTAREA** revine la programul zilei.
+- Penalizari: se judeca antrenamentul activ in ziua respectiva (cel mutat, daca a fost mutat).
+  Daca o zi sarita a fost penalizata si e recuperata in urmatoarele 7 zile, XP-ul se intoarce.
+  Daca un antrenament a fost facut in avans in aceeasi saptamana, ziua lui nu mai e penalizata.
+- Datele existente raman: aceeasi baza de date (`AntrenamentCristi_DB`), se inlocuieste doar
+  `app.compiled.js` in repo.

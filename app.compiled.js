@@ -58,7 +58,7 @@ async function loadFromIDB() {
     return null;
   }
 }
-const SAVE_FIELDS = ["level", "xp", "stats", "done", "doneEx", "doneW", "totalXp", "qC", "streak", "weightLog", "muscleXp", "lastDailyReset", "lastWeeklyReset", "penaltyLog", "liftLog", "vacation", "sleepLog", "workoutCalendar", "exerciseSwaps", "targetWeight", "startDate", "v2"];
+const SAVE_FIELDS = ["level", "xp", "stats", "done", "doneEx", "doneW", "totalXp", "qC", "streak", "weightLog", "muscleXp", "lastDailyReset", "lastWeeklyReset", "penaltyLog", "liftLog", "vacation", "sleepLog", "workoutCalendar", "exerciseSwaps", "targetWeight", "startDate", "v2", "dayMove", "mutari"];
 const DEFAULT_STATE = {
   level: 1,
   xp: 0,
@@ -99,7 +99,9 @@ const DEFAULT_STATE = {
   exerciseSwaps: {},
   targetWeight: null,
   startDate: null,
-  v2: true
+  v2: true,
+  dayMove: null,
+  mutari: []
 };
 
 /* ─── RANGURI ─── */
@@ -1798,6 +1800,7 @@ function ExCard({
     todayStr,
     ziSel,
     todayDow,
+    effDow,
     selDay
   } = ctx;
   const swapped = (S.exerciseSwaps || {})[todayStr + "_" + ex.name];
@@ -1805,7 +1808,7 @@ function ExCard({
   const deschis = openEx === ex.name;
   const n = nrSeturi(ex.sets);
   const last = getLast(ex.name);
-  const esteAzi = selDay === todayDow;
+  const esteAzi = selDay === effDow;
   const sets = loggerSets[ex.name] || Array.from({
     length: n
   }, () => ({
@@ -2092,7 +2095,7 @@ function ExCard({
       marginBottom: 14,
       lineHeight: 1.5
     }
-  }, "Seturile se scriu doar in ziua antrenamentului."), /*#__PURE__*/React.createElement("div", {
+  }, "Seturile se scriu doar in ziua antrenamentului. Ca sa faci antrenamentul asta azi, apasa sus pe «FAC ANTRENAMENTUL ASTA AZI»."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -2234,8 +2237,12 @@ function TabSala({
     setShowIncalzire,
     showRelaxare,
     setShowRelaxare,
-    todayDow
+    todayDow,
+    effDow,
+    mutaAzi,
+    anuleazaMutare
   } = ctx;
+  const mutat = effDow !== todayDow;
   const [showReguli, setShowReguli] = useState(false);
   const ex = ziSel.exercises || [];
   const facute = ex.filter(e => doneEx.includes(e.name)).length;
@@ -2257,7 +2264,7 @@ function TabSala({
         padding: "12px 0",
         borderRadius: 10,
         background: activ ? z.color + "33" : "rgba(255,255,255,.04)",
-        border: "2px solid " + (activ ? z.color : d === todayDow ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.08)"),
+        border: "2px solid " + (activ ? z.color : d === effDow ? "#f59e0b" : d === todayDow ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.08)"),
         color: activ ? "#fff" : "#94a3b8",
         fontFamily: "inherit",
         cursor: "pointer"
@@ -2282,7 +2289,7 @@ function TabSala({
       color: "#94a3b8",
       fontWeight: 700
     }
-  }, ziSel.day.toUpperCase(), selDay === todayDow ? " — ASTAZI" : ""), /*#__PURE__*/React.createElement("div", {
+  }, ziSel.day.toUpperCase(), selDay === effDow ? mutat ? " — MUTAT PE AZI" : " — ASTAZI" : selDay === todayDow ? " — ZIUA DE AZI (inlocuita)" : ""), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: F.xxl,
       fontWeight: 900,
@@ -2310,7 +2317,25 @@ function TabSala({
       marginTop: 12,
       fontWeight: 900
     }
-  }, facute, " din ", ex.length, " exercitii") : null), vacation ? /*#__PURE__*/React.createElement("div", {
+  }, facute, " din ", ex.length, " exercitii") : null, ex.length && selDay !== effDow ? /*#__PURE__*/React.createElement(BigBtn, {
+    onClick: () => mutaAzi(selDay),
+    bg: "rgba(245,158,11,.16)",
+    border: "rgba(245,158,11,.55)",
+    color: "#fcd34d",
+    style: {
+      marginTop: 14
+    }
+  }, "📅 FAC ANTRENAMENTUL ASTA AZI") : null, mutat && selDay === effDow ? /*#__PURE__*/React.createElement(BigBtn, {
+    onClick: anuleazaMutare,
+    bg: "rgba(255,255,255,.05)",
+    border: "rgba(255,255,255,.2)",
+    color: "#cbd5e1",
+    style: {
+      marginTop: 14,
+      fontSize: F.sm,
+      padding: "12px 14px"
+    }
+  }, "↩ ANULEAZA MUTAREA — inapoi la " + (PROG[todayDow] || PROG[0]).day) : null), vacation ? /*#__PURE__*/React.createElement("div", {
     style: {
       background: "rgba(245,158,11,.1)",
       border: "2px solid rgba(245,158,11,.3)",
@@ -2911,8 +2936,12 @@ function App() {
             let total = 0,
               missedCount = 0;
             const det = [];
-            const yPPL = (st.vacation ? ACASA : PPL)[yDay];
-            if (yPPL && yPPL.type !== "ODIHNA") {
+            const yMove = st.dayMove && st.dayMove.date === st.lastDailyReset ? st.dayMove.dow : null;
+            const yProgDow = yMove !== null ? yMove : yDay;
+            const yPPL = (st.vacation ? ACASA : PPL)[yProgDow];
+            const yWeek = getWeekId(st.lastDailyReset);
+            const dejaMutata = yMove === null && (st.mutari || []).some(m => m.dow === yDay && m.date !== st.lastDailyReset && getWeekId(m.date) === yWeek);
+            if (yPPL && yPPL.type !== "ODIHNA" && !dejaMutata) {
               const missedEx = yPPL.exercises.filter(ex => !ex.finisher && !st.doneEx.includes(ex.name));
               if (missedEx.length) {
                 const p = missedEx.length * 10;
@@ -2971,6 +3000,7 @@ function App() {
       } catch (e) {
         console.error("Eroare la incarcare", e);
       } finally {
+        if (g.current.dayMove && g.current.dayMove.date === todayStr) setSelDay(g.current.dayMove.dow);
         setLoaded(true);
         forceUpdate();
       }
@@ -3239,8 +3269,60 @@ function App() {
 
   /* ─── PROGRAMUL DE AZI ─── */
   const PROG = vacation ? ACASA : PPL;
+  const effDow = S.dayMove && S.dayMove.date === todayStr ? S.dayMove.dow : todayDow;
   const ziSel = PROG[selDay] || PROG[0];
-  const ziAzi = PROG[todayDow] || PROG[0];
+  const ziAzi = PROG[effDow] || PROG[0];
+  const mutaAzi = dow => {
+    const changes = {
+      dayMove: {
+        date: todayStr,
+        dow
+      },
+      mutari: [...(S.mutari || []).filter(m => m.date !== todayStr), {
+        date: todayStr,
+        dow
+      }].slice(-30)
+    };
+    /* daca ziua asta a fost penalizata in ultimele 7 zile, penalizarea se intoarce */
+    const acum = new Date(todayStr).getTime();
+    let refund = 0;
+    const pl = (S.penaltyLog || []).map(e => {
+      if (e.tip === "zilnic" && !e.recuperat && new Date(e.date).getDay() === dow && acum - new Date(e.date).getTime() <= 7 * 86400000 && acum > new Date(e.date).getTime()) {
+        refund += e.penalty;
+        return {
+          ...e,
+          recuperat: true
+        };
+      }
+      return e;
+    });
+    if (refund > 0) {
+      let nx = S.xp + refund,
+        nl = S.level;
+      while (nx >= getXp(nl)) {
+        nx -= getXp(nl);
+        nl++;
+      }
+      Object.assign(changes, {
+        penaltyLog: pl,
+        xp: nx,
+        level: nl,
+        totalXp: S.totalXp + refund
+      });
+    }
+    update(changes);
+    setOpenEx(null);
+    setNotif(refund > 0 ? "📅 Antrenament mutat pe azi · +" + refund + " XP inapoi" : "📅 Antrenament mutat pe azi");
+  };
+  const anuleazaMutare = () => {
+    update({
+      dayMove: null,
+      mutari: (S.mutari || []).filter(m => m.date !== todayStr)
+    });
+    setSelDay(todayDow);
+    setOpenEx(null);
+    setNotif("↩ Inapoi la programul zilei");
+  };
   const ctx = {
     S,
     g,
@@ -3261,6 +3343,9 @@ function App() {
     liftLog,
     todayStr,
     todayDow,
+    effDow,
+    mutaAzi,
+    anuleazaMutare,
     PROG,
     ziSel,
     ziAzi,
